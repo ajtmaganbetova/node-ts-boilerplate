@@ -1,14 +1,14 @@
-import { Router } from 'express';
-import GptService from './gpt-service';
-import GptController from './gpt-controller';
+// import { Router } from 'express';
+// import GptService from './gpt-service';
+// import GptController from './gpt-controller';
 
-//in order to provide our frontend with the user data, we need to specify user routes
+// //in order to provide our frontend with the user data, we need to specify user routes
 
-const gptRouter = Router();
+// const gptRouter = Router();
 
-const gptService = new GptService();
-const gptController = new GptController(gptService);
+// const gptService = new GptService();
+// const gptController = new GptController(gptService);
 
-gptRouter.post('/books/', gptController.getBooks);
+// gptRouter.post('/books/', gptController.getBooks);
 
-export default gptRouter;
+// export default gptRouter;
