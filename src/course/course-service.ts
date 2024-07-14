@@ -103,7 +103,8 @@ export async function fetchGeminiResponse(prompt: string) {
     }
 
     const data = await response.json();
-    return data;
+    const generatedSchedule = data.candidates[0].content.parts[0].text;
+    return generatedSchedule;
   } catch (error) {
     console.error("Error fetching Gemini response:", error);
     throw error;
