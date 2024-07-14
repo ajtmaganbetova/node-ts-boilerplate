@@ -12,3 +12,12 @@ export type Course = {
   faculty: string;
   room: string;
 };
+
+export type CourseSchedule = {
+  Monday: Course[];
+  Tuesday: Course[];
+  Wednesday: Course[];
+  Thursday: Course[];
+  Friday: Course[];
+  Distant: Course[];
+};

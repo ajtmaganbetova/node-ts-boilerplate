@@ -3,6 +3,6 @@ import { handleCourseRequest } from "./course-controller";
 
 const courseRouter = Router();
 
-courseRouter.post("/courses", handleCourseRequest);
+courseRouter.post("/courses/", handleCourseRequest);
 
 export default courseRouter;

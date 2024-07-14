@@ -1,7 +1,7 @@
 // src/controllers/courseController.ts
 import { Request, Response } from "express";
 import { sheetData, fetchGeminiResponse } from "./course-service";
-import { Course } from "./course-types";
+import { Course, CourseSchedule } from "./course-types";
 import { type } from "os";
 import extract from "extract-json-from-string";
 
@@ -42,9 +42,14 @@ function concatenateDays(courses: Course[]): object {
 
 const filterCourses = (sectionsJson: string, courses: Course[]): Course[] => {
   const sectionsArray = JSON.parse(sectionsJson);
-  const sections: string[] = sectionsArray[0];
+  const sections: string[] | undefined = sectionsArray?.[0]; // Use optional chaining to access sectionsArray safely
 
-  // filter the courses based on the section types
+  if (!sections) {
+    console.error("Sections array is undefined or null.");
+    return [];
+  }
+
+  // Filter the courses based on the section types
   return courses.filter((course) => sections.includes(course.type));
 };
 
@@ -52,6 +57,7 @@ export async function handleCourseRequest(req: Request, res: Response) {
   try {
     // add comments field
     // add mutliple course selection
+    console.log("Fetching schedule from server...");
     const { courseAbbr, semester } = req.body;
 
     const courses = await sheetData(semester, courseAbbr);
@@ -63,42 +69,42 @@ export async function handleCourseRequest(req: Request, res: Response) {
     const stOccurences = concatenateDays(courses);
 
     const initialPrompt = `You are a friendly schedule assistant that helps students register for courses using the particular university's Public Course Catalog. Your job is to get the user's intended course's list of distinct section types and list them. Do not consider numbers that come before section types. Here are list of all possible section types: 
-'L': 'Lecture',
-'R': 'Recitation',
-'S': 'Seminar',
-'PLb': 'PhysLab',
-'CLb': 'CompLab',
-'Lb': 'Lab',
-'Int': 'Internship'. Generate a list of distinct section types that exist in ${
+    'L': 'Lecture',
+    'R': 'Recitation',
+    'S': 'Seminar',
+    'PLb': 'PhysLab',
+    'CLb': 'CompLab',
+    'Lb': 'Lab',
+    'Int': 'Internship'. Generate a list of different section numbers that are classified under distinct section types that exist in the course ${
       courses[0].abbreviation
-    } with additional information about how many times that numbered section appeared in the following courses information: ${JSON.stringify(
-      courses
-    )}; in the following format and do not include any other words/explanation in the output: 
-{
-  "L": {
-    "1L": 2,
-    "2L": 2,
-    "3L": 2,
-    "4L": 2,
-    "5L": 2
-  },
-  "R": {
-    "1R": 1,
-    "2R": 1,
-    "3R": 1,
-    "4R": 1
-  },
-  "S": {
-    "1S": 1,
-    "2S": 1,
-    "3S": 1,
-    "4S": 1,
-    "5S": 1,
-    "6S": 1,
-    "7S": 1,
-    "8S": 1
-  }
-} \n Note that this is just an example and some courses may not have section types that others have.`;
+    }. Available sections come from following list of sections: ${JSON.stringify(
+      stOccurences
+    )}. Output in the following format and do not include any other words/explanation in the output: 
+    {
+      "L": {
+        "1L",
+        "2L",
+        "3L",
+        "4L",
+        "5L"
+      },
+      "R": {
+        "1R",
+        "2R",
+        "3R",
+        "4R"
+      },
+      "S": {
+        "1S",
+        "2S",
+        "3S",
+        "4S",
+        "5S",
+        "6S",
+        "7S",
+        "8S"
+      }
+    } \n Note that this is just an example and some courses may not have section types that others have.`;
 
     const initialData = await fetchGeminiResponse(initialPrompt);
 
@@ -142,65 +148,86 @@ export async function handleCourseRequest(req: Request, res: Response) {
     ]"
     
     4) Always stick with the reference: "${JSON.stringify(stOccurences)}"
-    5) According to the number of distinct section types, write the output in format like this (it depends on existence of various course types, if there are 2 types, output 2 number selections):
+    5) According to the number of distinct section types, write the output in format as JSON like this (it depends on existence of various course types, if there are 2 types, output 2 number selections):
     [
       "1L",
       "2R",
       "3S"
-    ] and justify why you chose these sections.`;
+    ] and justify why you chose these sections. Do not output any JSON objects other than the expected output, because I will extract that JSON object from your output. If there are any other JSON objects, it will cause an error.`;
     const refinedData = await fetchGeminiResponse(refinedPrompt);
-
-    // console.log("Refined Data:", refinedData);
 
     const extractedJson = extract(refinedData);
     const selectedSections = filterCourses(JSON.stringify(extractedJson), courses);
 
-    const detailedPrompt = `You are a schedule assistant that helps students register for courses using the particular university's Public Course Catalog. At this point, your job is to get selected sections and generate a JSON schedule by filtering them by days (M - Monday, T - Tuesday, W - Wednesday, R - Thursday, F - Friday), times, enrolled, capacity, faculty, and room. Here's your reference: ${JSON.stringify(
+    const detailedPrompt = `You are a schedule assistant that helps students register for courses using the particular university's Public Course Catalog. At this point, your job is to get selected sections and generate a JSON schedule by filtering them by days (M - Monday, T - Tuesday, W - Wednesday, R - Thursday, F - Friday), times, enrolled, capacity, faculty, and room. Here's a list of sections the student wants to include in a schedule: ${JSON.stringify(
       selectedSections
-    )}. JSON-formatted schedule should look like this without any explanation and words (since this is an example, the actual data may vary):
+    )}. JSON-formatted schedule should look like this without any explanation and words (since this is an example, the actual data may vary according to the selected sections):
     {
         "Monday":
         [
           {
-            "school": "SSH",
-            "level": "UG",
-            "abbreviation": "HST 100",
-            "type": "1S",
-            "title": "History of Kazakhstan",
-            "credits": "6",
+            "school": "some school name",
+            "level": "some level",
+            "abbreviation": "course abbreviation",
+            "type": "numbered section type",
+            "title": "some course title",
+            "credits": "some credits",
             "days": "M",
-            "times": "09:00 AM-09:50 AM",
-            "enrolled": "22",
-            "capacity": "24",
-            "faculty": "Javeed Ahwar",
-            "room": "8.319 - cap:30"
+            "times": "some time",
+            "enrolled": "some number",
+            "capacity": "some number",
+            "faculty": "some faculty",
+            "room": "some room number"
           }
         ],
         "Tuesday": [],
-        "Wednesday": [],
-        "Thursday": [],
-        "Friday": [],
-        "Unknown":
+        "Wednesday": 
         [
           {
-            "school": "SSH",
-            "level": "UG",
-            "abbreviation": "HST 100",
-            "type": "1L",
-            "title": "History of Kazakhstan",
-            "credits": "6",
+            "school": "some school name",
+            "level": "some level",
+            "abbreviation": "course abbreviation",
+            "type": "numbered section type",
+            "title": "some course title",
+            "credits": "some credits",
+            "days": "W",
+            "times": "some time",
+            "enrolled": "some number",
+            "capacity": "some number",
+            "faculty": "some faculty",
+            "room": "some room number"
+          }
+        ],
+        "Thursday": [],
+        "Friday": [],
+        "Distant":
+        [
+          {
+            "school": "some school name",
+            "level": "some level",
+            "abbreviation": "course abbreviation",
+            "type": "numbered section type",
+            "title": "some course title",
+            "credits": "some credits",
             "days": "",
             "times": "Online/Distant",
-            "enrolled": "492",
-            "capacity": "504",
-            "faculty": "Mikhail Akulov",
-            "room": ""
+            "enrolled": "some number",
+            "capacity": "some number",
+            "faculty": "some faculty",
+            "room": "some room number"
           }
         ]
-    }, where "Unknown" is a placeholder for days that are not specified.`;
-    const finalData = await fetchGeminiResponse(detailedPrompt);
+    }, where "Distant" is a placeholder for days that are not specified. If there are no courses on a particular day, the array should be empty. If there are no courses at all, return an empty object.`;
+    let finalData = await fetchGeminiResponse(detailedPrompt);
 
-    return res.json(finalData);
+    finalData = finalData
+      .trim()
+      .replace(/^```json\s*([\s\S]*)\s*```$/, "$1");
+
+    const parsedSchedule = JSON.parse(finalData) as CourseSchedule;
+    console.log("Parsed Schedule:", parsedSchedule);
+
+    return res.json(parsedSchedule);
   } catch (error) {
     console.error((error as Error).message);
     return res.status(500).json({ error: (error as Error).message });
