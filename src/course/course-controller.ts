@@ -57,7 +57,7 @@ export async function handleCourseRequest(req: Request, res: Response) {
   try {
     // add comments field
     // add mutliple course selection
-    console.log("Fetching schedule from server...");
+    // console.log("Fetching schedule from server...");
     const { courseAbbr, semester } = req.body;
 
     const courses = await sheetData(semester, courseAbbr);
@@ -217,7 +217,8 @@ export async function handleCourseRequest(req: Request, res: Response) {
             "room": "some room number"
           }
         ]
-    }, where "Distant" is a placeholder for days that are not specified. If there are no courses on a particular day, the array should be empty. If there are no courses at all, return an empty object.`;
+    }, where "Distant" is a placeholder for days that are not specified. Usually they have only 'Int' type of section.
+    If there are no courses on a particular day, the array should be empty. If there are no courses at all, return an empty object.`;
     let finalData = await fetchGeminiResponse(detailedPrompt);
 
     finalData = finalData
