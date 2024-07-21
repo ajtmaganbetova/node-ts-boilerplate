@@ -1,3 +1,4 @@
+// course-router.ts
 import { Router } from "express";
 import { handleCourseRequest } from "./course-controller";
 

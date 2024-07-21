@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const GEMINI_API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent`;
+const OPENAI_API_ENDPOINT = `https://api.openai.com/v1/chat/completions`;
 
 const sheetId = process.env.NEXT_GOOGLE_SHEET_ID as string;
 const range = "A4:O";
@@ -33,11 +33,10 @@ export async function sheetData(semester: string, courseAbbr: string) {
     const tabName = semester;
 
     const data = await glSheets.spreadsheets.values.get({
-      spreadsheetId: sheetId, // Ensure spreadsheetId is correctly set here
+      spreadsheetId: sheetId,
       range: `${tabName}!${range}`,
     });
 
-    // Handle response data as needed
     if (!data.data.values) {
       return [];
     }
@@ -45,7 +44,7 @@ export async function sheetData(semester: string, courseAbbr: string) {
     const [headerRow, ...rows] = data.data.values;
 
     const courses: Course[] = rows
-      .filter((row) => row[2] === courseAbbr) // Adjusted to filter by course abbreviation
+      .filter((row) => row[2] === courseAbbr)
       .map((row) => {
         return {
           school: row[0],
@@ -70,44 +69,37 @@ export async function sheetData(semester: string, courseAbbr: string) {
   }
 }
 
-export async function fetchGeminiResponse(prompt: string) {
+export async function fetchOpenAIResponse(prompt: string) {
   try {
-    const response = await fetch(
-      `${GEMINI_API_ENDPOINT}?key=${process.env.GOOGLE_API_KEY}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.3,
+    const response = await fetch(OPENAI_API_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: "You are a professional schedule assistant.",
           },
-        }),
-      }
-    );
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.3,
+      }),
+    });
 
     if (!response.ok) {
       throw new Error(
-        `Failed to fetch Gemini response: ${response.statusText}`
+        `Failed to fetch OpenAI response: ${response.statusText}`
       );
     }
 
     const data = await response.json();
-    const responseText = data.candidates[0].content.parts[0].text;
-    
-    return responseText;
+    return data.choices[0].message.content;
   } catch (error) {
-    console.error("Error fetching Gemini response:", error);
+    console.error("Error fetching OpenAI response:", error);
     throw error;
   }
 }
